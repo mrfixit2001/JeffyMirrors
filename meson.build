@@ -1,8 +1,7 @@
 project(
   'libmali', 'c',
   version : '1.9.0',
-  meson_version : '>=0.54.0',
-  default_options : ['b_asneeded=false'])
+  meson_version : '>=0.53.0')
 
 mali_version = meson.project_version()
 
@@ -44,32 +43,39 @@ endif
 message('Source libraries: @0@'.format(libs))
 
 # Load original mali library for later function checks and linking
-mali = cc.find_library(fs.stem(default_lib).replace('lib',''),
-  dirs : meson.current_source_dir() / fs.parent(default_lib))
+run_command('ln', '-rsf', meson.current_source_dir() / default_lib,
+  meson.current_build_dir() / 'libmali-prebuilt.so', check : false)
+mali = cc.find_library('mali-prebuilt', dirs : meson.current_build_dir())
 
 is_rk3288 = gpu == 'midgard-t76x'
 is_utgard = gpu.split('-')[0] == 'utgard'
 is_px3se = gpu == 'utgard-400' and subversion == 'r3p0'
 
-has_gbm = cc.has_function('gbm_create_device', dependencies : mali)
+# Parse platforms
+has_gbm = run_command('grep', '-wq', 'gbm_create_device', default_lib,
+  check : false).returncode() == 0
 has_x11 = run_command('grep', '-wq', 'XSync', default_lib,
   check : false).returncode() == 0
-has_wayland = cc.has_function('wl_egl_window_create', dependencies : mali)
+has_wayland = run_command('grep', '-wq', 'wl_egl_window_create', default_lib,
+  check : false).returncode() == 0
+
+message('Using ' + default_lib + ' with' + (has_x11 ? ' x11' : '') +
+  (has_wayland ? ' wayland' : '') + (has_gbm ? ' gbm' : ''))
 
 # Required packages
 requires = []
-if has_gbm
+if has_gbm or has_wayland or has_x11
   requires = ['libdrm']
 endif
 if has_wayland
-  requires = ['libdrm', 'wayland-client', 'wayland-server']
+  requires += ['wayland-client', 'wayland-server']
 
   if is_px3se
     requires += ['libffi', 'libcrypto']
   endif
 endif
 if has_x11
-  requires = ['libdrm', 'x11', 'xcb']
+  requires += ['x11', 'xcb']
 
   if is_utgard
     requires += ['xfixes', 'xext', 'xau', 'xdmcp', 'xdamage']
@@ -77,6 +83,11 @@ if has_x11
     requires += ['x11-xcb', 'xcb-dri2']
   endif
 endif
+
+# Required dependencies
+foreach require : requires
+  dependency(require)
+endforeach
 
 if wrappers_opts.auto() and is_utgard
   wrappers = false
@@ -87,6 +98,9 @@ endif
 
 if wrappers
   message('Provide wrappers')
+
+  # Wrappers would link to the real library.
+  add_project_link_arguments('-Wl,--no-as-needed', language : 'c')
 else
   # The vendor package requires soname of wrappers.
   if vendor_package
@@ -236,6 +250,7 @@ foreach name, values : map
       link_with : [libhook, libmali],
       install : true,
       install_dir : wrapper_libdir,
+      install_rpath : '$ORIGIN',
       version : version)
   endforeach
 
@@ -318,7 +333,8 @@ endif
 
 # Install firmwares
 if gpu == 'valhall-g610'
-  install_data('firmware/g610/mali_csffw.bin', install_dir : '/lib/firmware')
+  install_data('firmware/g610/mali_csffw.bin',
+    install_dir : get_option('firmware-dir'))
 endif
 
 if vendor_package

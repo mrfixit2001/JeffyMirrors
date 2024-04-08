@@ -21,10 +21,11 @@ libhook_cflags = [
   '-DLIBMALI_SO="libmali.so.' + mali_version.split('.')[0] + '"',
 ]
 
-libhook_dep = [mali]
-libhook_dep += dependency('threads')
-libhook_dep += cc.find_library('dl', required : false)
-libhook_dep += dependency('libdrm', version : '>= 2.4.0')
+libhook_dep = [
+  dependency('threads'),
+  cc.find_library('dl', required : false),
+  dependency('libdrm', version : '>= 2.4.0'),
+]
 
 libhook_inc = []
 
@@ -56,22 +57,24 @@ if cc.has_function('eglCreateContext', dependencies : mali)
 endif
 
 libhook = shared_library(
-  'mali_hook',
+  'mali-hook',
   'hook.c',
   c_args : libhook_cflags,
   include_directories : libhook_inc,
   dependencies : libhook_dep,
   install : true,
+  install_rpath : '$ORIGIN',
   version : mali_version)
 
-libhook_ldflags = ['-L${libdir}', '-lmali_hook']
+libhook_ldflags = ['-L${libdir}', '-lmali-hook']
 
 # A dummy library to ensure that the hook library would not be removed as unused
 libinjector = static_library(
-  'mali_hook_injector',
+  'mali-hook-injector',
   'injector.c',
-  install : true)
+  install : true,
+  install_rpath : '$ORIGIN')
 
 # Ensure that the hook library would not be removed as unused
 libhook_ldflags += \
-  ['-Wl,--whole-archive', '-lmali_hook_injector', '-Wl,--no-whole-archive']
+  ['-Wl,--whole-archive', '-lmali-hook-injector', '-Wl,--no-whole-archive']
