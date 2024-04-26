@@ -15,6 +15,10 @@ ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \> 25)))
 LOCAL_CFLAGS += -DUSE_AHARDWAREBUFFER=1
 endif
 
+ifeq (1,$(strip $(shell expr $(PLATFORM_SDK_VERSION) \> 31)))
+LOCAL_CFLAGS += -DUSE_HARDWARE_ROCKCHIP=1
+endif
+
 LOCAL_CFLAGS += -Wall -Werror -Wunreachable-code
 
 LOCAL_C_INCLUDES += \
@@ -70,6 +74,24 @@ endif
 LOCAL_SRC_FILES:= \
     rgaImDemo.cpp \
     args.cpp
+
+# utils
+LOCAL_C_INCLUDES += \
+    $(LOCAL_PATH)/../utils/ \
+	$(LOCAL_PATH)/../../include
+
+LOCAL_SRC_FILES += \
+	../utils/utils.cpp
+
+# allocator
+LOCAL_C_INCLUDES += \
+	$(LOCAL_PATH)/../utils/allocator/include \
+    $(LOCAL_PATH)/../utils/3rdparty/libdrm/include \
+	$(LOCAL_PATH)/../utils/3rdparty/libdrm/include/libdrm \
+
+LOCAL_SRC_FILES += \
+	../utils/allocator/dma_alloc.cpp \
+	../utils/allocator/drm_alloc.cpp \
 
 LOCAL_MODULE:= rgaImDemo
 
